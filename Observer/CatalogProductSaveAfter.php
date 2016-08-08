@@ -1,4 +1,6 @@
-<?php namespace Sebwite\ProductDownloads\Model\Adminhtml\Download;
+<?php
+
+namespace Sebwite\ProductDownloads\Observer;
 
 use Magento\Backend\App\Action\Context;
 use Magento\Framework\Event\Observer as EventObserver;
@@ -13,21 +15,25 @@ use Sebwite\ProductDownloads\Model\Upload;
  * @package     Sebwite\ProductDownloads
  * @copyright   Copyright (c) 2015, Sebwite. All rights reserved
  */
-class Observer implements \Magento\Framework\Event\ObserverInterface
+class CatalogProductSaveAfter implements \Magento\Framework\Event\ObserverInterface
 {
+    /**
+     * @var \Magento\Framework\Registry
+     */
+    protected $coreRegistry;
+
 
     /**
-     * @var Magento\Framework\Registry
+     * @var \Sebwite\ProductDownloads\Model\Upload
      */
-    private $coreRegistry;
+    protected $upload;
+
+
     /**
-     * @var Sebwite\ProductDownloads\Model\Upload
+     * @var \Magento\Backend\App\Action\Context
      */
-    private $upload;
-    /**
-     * @var Magento\Backend\App\Action\Context
-     */
-    private $context;
+    protected $context;
+
 
     public function __construct(Registry $coreRegistry, Upload $upload, Context $context)
     {
@@ -36,34 +42,40 @@ class Observer implements \Magento\Framework\Event\ObserverInterface
         $this->context = $context;
     }
 
+
     /**
-     * save product data
+     * Saves uploaded files, and assigns them to product
      *
-     * @param $observer
+     * @param EventObserver $observer
      *
      * @return $this
      */
     public function execute(EventObserver $observer)
     {
-        $downloads = $this->context->getRequest()->getFiles('downloads', -1);
+        /* @var \Magento\Framework\App\Request\Http $request */
+        $request = $this->context->getRequest();
+        $downloads = $request->getFiles('downloads', -1);
+        #\Zend_Debug::dump($downloads); die(__FILE__." line ".__LINE__);
 
-        if ($downloads != '-1') {
-
+        if ($downloads != -1)
+        {
             // Get current product
-            $product = $this->coreRegistry->registry('product');
+            /* @var \Magento\Catalog\Model\Product $product */
+            $product   = $this->coreRegistry->registry('product');
             $productId = $product->getId();
 
-            // Loop through uploaded downlaods
-            foreach ($downloads as $download) {
-
-                // Upload file
+            // Loop through uploaded downloads
+            foreach ($downloads as $download)
+            {
+                // Get uploaded file
                 $uploadedDownload = $this->upload->uploadFile($download);
 
-                if ($uploadedDownload) {
+                // Store data in database
+                if ($uploadedDownload)
+                {
                     $objectManager = $this->context->getObjectManager();
-                    // Store date in database
+                    /* @var \Sebwite\ProductDownloads\Model\Download $download */
                     $download = $objectManager->create('Sebwite\ProductDownloads\Model\Download');
-
                     $download->setDownloadUrl($uploadedDownload['file']);
                     $download->setDownloadFile($uploadedDownload['name']);
                     $download->setDownloadType($uploadedDownload['type']);
